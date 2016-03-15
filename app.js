@@ -1,6 +1,9 @@
 var Twit = require('twit');
+var moment = require('moment');
 var config  = require('./config');
 var MongoClient = require('mongodb').MongoClient;
+
+var words = require('./words'); 
 
 var T = new Twit(config);
 
@@ -9,103 +12,89 @@ var T = new Twit(config);
 // look like.
 var dbName = 'twitter-bot';
 var collectionName = 'inputs';
-var words = [
-    // 'javascript',
-    // 'node',
-    'nodejs',
-    'node.js',
-    'node_js',
-    'node js',
-    'angular js',
-    'angular.js',
-    'angularjs',
-    'angular_js',
-    'angular2',
-    'angular2.0',
-    'angular 2',
-    'angularmaterial',
-    'materialdesign',
-    'angularmaterialdesign',
-    'angular material',
-    'angular material design',
-    'material design',
-    'mongodb',
-    'mongoose',
-    'phonegap',
-    'ionicframework',
-    'ionic framework',
-    'docker',
-    'html5',
-    'css3',
-    'webcomponent',
-    'webcomponents',
-    'web components',
-    'web component',
-    // 'saas',
-    // 'Karma',
-    'Protractor',
-    // 'Mocha',
-    // 'Sinon',
-    // 'Chai',
-    'lodash',
-    'webstorm'
-];
-// End change section
+
 
 var tweetDb, tweetColl;
 
-var stream = T.stream('statuses/filter', {track: words });
+var stream = T.stream('statuses/filter', {track: words.program.concat(words.html) });
 stream.on('tweet', function(tweet) {
     console.log('Incoming Tweet');
-    // console.log(tweet.text);
     // Log the tweet no matter what, as log as a connection to Mongo has been established
-    if(tweetColl) {
-        // tweetColl.insert(tweet, function(err, result) {
-            // if(err) console.log(err);
-            // else console.log('Tweet logged');
-            
-        // });
-    // console.log(tweet.user.followers_count);
-    // console.log(tweet.retweet_count);
-    console.log(tweet.text);
-    console.log(' ');
+    
+    // if(tweetColl) {
+    //     return ;
+    // }
+    // tweetColl.insert(tweet, function(err, result) {
+        // if(err) console.log(err);
+        // else console.log('Tweet logged');
+        
+    // });
     var text = tweet.text.toLowerCase();
-
-    if(!tweet.in_reply_to_user_id &&                                     // Don't Fav/RT the middle of a convo
-        !user_blacklist.test(tweet.user.screen_name) &&         // Prevent Fav/RT/Following specific users
+    
+    if(
+        // Se nao e retweet
+        !tweet.retweeted_status &&
+        !tweet.in_reply_to_user_id &&
         (tweet.lang === 'en' || tweet.lang === 'pt-BR') &&
-        /https|http/g.exec(text) &&
-        !blacklist.test(text) &&
-        whitelist.test(text) ) {
-            // console.log('scheduling RT');            
-            // scheduleFuture(retweetTweet, tweet);
+        // whitelist.test(text) &&
+        empregos_whitelist.test(text) 
+      ) {
 
-            // Roll the dice to favorite
-            if(!tweet.favorited && isLucky(1/8)) {
-                console.log('Scheduling Favorite');
-                scheduleFuture(favoriteTweet, tweet);
-            }
-            // Roll to retweet
-            if(words_html.test(text)) {
-                if(!tweet.retweeted && 
-                        isLucky(1/4)) {
-                    console.log('Scheduling html RT');
-                    scheduleFuture(retweetTweet, tweet);
-                }
-            } else {
-                if (!tweet.retweeted) {
-                    console.log('Scheduling MEAN RT');
-                    scheduleFuture(retweetTweet, tweet);
-                }
-            }
-
-            // Roll a third time to follow
-            // if(!tweet.user.following && isLucky(1/2)) {
-            //     console.log('Scheduling Follow');
-            //     scheduleFuture(followUser, tweet.user);
-            // }
+        if (!tweet.retweeted) {
+            console.log('Scheduling VAGA  RT');
+            scheduleFuture(retweetTweet, tweet, 6);
         }
     }
+
+    // Vaga de empregos
+    
+    if(
+        // Se nao e retweet
+        // !tweet.retweeted_status &&
+        // Don't Fav/RT the middle of a convo
+        !tweet.in_reply_to_user_id &&                                     
+        // Prevent Fav/RT/Following specific users
+        !user_blacklist.test(tweet.user.screen_name) &&
+        (tweet.lang === 'en' || tweet.lang === 'pt-BR') &&
+        whitelist.test(text) &&
+        !blacklist.test(text) &&
+        // Tem que ter link
+        /https|http/g.exec(text) 
+      ) {
+        // Consta na whitelist, mas precisa de uma moderada.
+        // if (words.lightWhitelistPattern.test(text) && isLucky(1/4)) {
+        //     console.log('***** ligh whitelist', text);
+        //     return ;
+        // }
+              
+        // console.log('scheduling RT');            
+        // scheduleFuture(retweetTweet, tweet);
+
+        // Rejeita algumas urls, como reddit
+        if(tweet.entities && tweet.entities.urls && tweet.entities.urls.expanded_url) {
+            if (words.blacklistPattern(tweet.entities.urls.expanded_url)) {
+                console.log('********** Rejeitada url expandida', tweet.entities.urls.expanded_url);
+                return ;
+            } 
+        }
+
+        // Roll to retweet
+        if(words.htmlPattern.test(text)) {
+            if(!tweet.retweeted) {
+                console.log('Scheduling html RT');
+                scheduleFuture(retweetTweet, tweet, 4);
+                favorite(tweet);
+            }
+        } else {
+            if (!tweet.retweeted) {
+                console.log('Scheduling MEAN RT');
+                scheduleFuture(retweetTweet, tweet, 2);
+                favorite(tweet);
+                follow(tweet);
+            }
+        }
+    }
+
 });
 
 //
@@ -126,37 +115,77 @@ var blacklist = new RegExp([
 // Naive blacklist, based on regex
 var whitelist = new RegExp([
     'free',
+    'gratis',
+    'grátis',
     'learning',
+    'aprenda',
+    'aprendendo',
     'learncode',
     'learntocode',
     'learningcode',
     'learn',
+    'aprender',
     'beginners',
     'beginner',
+    'iniciante',
+    'iniciantes',
     'course',
-    'discount'
-].join('|'), 'i');
-
-var words_html = new RegExp([
-    'html5',
-    'css3',
-    'webcomponent',
-    'webcomponents',
-    'web components',
-    'web component'
+    'curso',
+    'tutorials',
+    'tutorial',
+    'discount',
+    'desconto'
 ].join('|'), 'i');
 
 var user_blacklist = new RegExp([
     'javascriptisez',
     'great_courses',
     'amazing_courses',
-    'AdsTweetBot'
+    'adstweetbot',
+    'webcodegeeks',
+    'docker'
 ].join('|'), 'i');
+
+var empregos_whitelist = new RegExp([
+    'vaga',
+    'vagas',
+    'carreira',
+    'emprego',
+    'freelance',
+    'freelancer',
+    'vacancy',
+    'vacancies',
+    'homeoffice',
+    'home office',
+    'home-office',
+    'job',
+    'trabalho',
+    'work'
+
+].join('|'), 'i');
+
+function favorite(tweet) {
+    if(!tweet.favorited && isLucky(1/13)) {
+        console.log('Scheduling Favorite');
+        scheduleFuture(favoriteTweet, tweet);
+    }
+}
+
+function follow(tweet) {
+    if(!tweet.user.following && isLucky(1/40)) {
+        console.log('Scheduling Follow');
+        scheduleFuture(followUser, tweet.user);
+    }
+}
 
 // Instead of Fav/RT/Follow immediately, do it after a variable delay.
 // Makes things seem a bit more human.
-var scheduleFuture = function(fn, arg) {
-    setTimeout(fn, randomMsBetween(20000, 90000), arg);
+var scheduleFuture = function(fn, arg, count) {
+    // 40 minutos a 1 hora e meia
+
+    setTimeout(fn.bind(this, arg, count), randomMsBetween((1000 * 60 * 60 * 1), (1000 * 60 * 60 * 1.5)));
+    // setTimeout(fn.bind(this, arg, count), randomMsBetween(2000, 3000));
+    
 };
 
 //Choose a random number between two given numbers
@@ -169,14 +198,55 @@ var isLucky = function(chances) {
     return (Math.random() < chances);
 };
 
-var favoriteTweet = function(tweet) {
+var favoriteTweet = function(tweet, count) {
     console.log('Favoriting tweet:' + tweet.text);
     T.post('favorites/create', { id: tweet.id_str }, cb);
+    // T.post('favorites/create', { id: tweet.id_str }, cb, count);
 };
 
-var retweetTweet = function(tweet) {
-    console.log('Retweeting tweet:' + tweet.text);
-    T.post('statuses/retweet/:id', { id: tweet.id_str }, cb);
+var retweetTweet = function(tweet, count) {
+    console.log('Try retweet tweet:', tweet.text);
+    T.get('statuses/show/:id', {id: tweet.id_str}, function(err, data, response) {
+
+        if (!data || err) {
+            console.log(err);
+            return ;
+        }
+       // Desnecessario, por retweets estarem removidos do criterio 
+        if(data.retweeted_status) {
+            console.log('****** data.retweeted_status.created_at'); 
+            created_at = data.retweeted_status.created_at; 
+        } else {
+            created_at = data.created_at;
+        }
+       
+       if (!isTweetDateToday()) {
+           console.log('******** POST ANTIGO -->', created_at);
+           return ;
+        }
+
+
+
+        console.log('Date:',  created_at);
+        console.log('count (arg) -->', count);
+        console.log('data.retweet_count -->', data.retweet_count);
+
+        if(data.retweet_count >= count) { 
+
+            console.log('******** Retweeting !!!');
+            console.log('retweet_count -->', data.retweet_count);
+
+            console.log('******** Search alternative date', data);
+
+            T.post('statuses/retweet/:id', { id: tweet.id_str }, cb);
+        }
+        
+        function isTweetDateToday() {
+            var today = moment().locale('en');
+            return today.isSame(new Date(created_at), 'day');
+        }
+
+    });
 };
 
 var followUser = function(user) {
@@ -185,32 +255,34 @@ var followUser = function(user) {
 };
 
 // Simple callback to swallow successes and log errors
-var cb = function(err) {
+var cb = function(err, data, response) {
     if(err) {
         console.log(err);
+        return;
     }
+    // console.log(data);
 };
 
 //Connect to a local Mongo Instance
-MongoClient.connect('mongodb://localhost:27017/' + dbName, function(err, db) {
-    if(err) {
-        console.log('ERROR: Cannot connect to mongo, tweets will not be logged');
-    } else {
-        console.log('Connected to mongo');
-        tweetDb = db;
-        tweetColl = db.collection(collectionName);
-    }
-});
-
-//Gracefully handle SIGINT
-process.on( 'SIGINT', function() {
-    console.log( "\nGracefully shutting down from SIGINT (Ctrl-C)" );
-    if(tweetDb) {
-        tweetDb.close();
-    }
-    if(stream){
-        stream.stop();
-    }
-
-    process.exit();
-});
+// MongoClient.connect('mongodb://localhost:27017/' + dbName, function(err, db) {
+//     if(err) {
+//         console.log('ERROR: Cannot connect to mongo, tweets will not be logged');
+//     } else {
+//         console.log('Connected to mongo');
+//         tweetDb = db;
+//         tweetColl = db.collection(collectionName);
+//     }
+// });
+//
+// //Gracefully handle SIGINT
+// process.on( 'SIGINT', function() {
+//     console.log( "\nGracefully shutting down from SIGINT (Ctrl-C)" );
+//     if(tweetDb) {
+//         tweetDb.close();
+//     }
+//     if(stream){
+//         stream.stop();
+//     }
+//
+//     process.exit();
+// });
