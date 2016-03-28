@@ -1,3 +1,4 @@
+var _ = require('lodash');
 var program = [
     'javascript',
     // 'node',
@@ -64,18 +65,53 @@ var htmlPattern = new RegExp(
 );
 
 var lightWhitelist = [
-    'docker'
+    'docker',
+    'udemy'
 ];
 
 var lightWhitelistPattern = new RegExp(
    lightWhitelist.join('|'), 'i' 
 );
 
+var userBlacklist = [
+    'javascriptisez',
+    'great_courses',
+    'amazing_courses',
+    'adstweetbot',
+    'webcodegeeks',
+    'javacodegeeks',
+    'prometeonet',
+    'docker',
+    'MongoDB',
+    '_ericelliott',
+    'ReactJS_News',
+    'AngularJS_News',
+    'melhore_me',
+    'creative_punch'
+];
+
+var userBlacklistPattern = new RegExp(userBlacklist.join('|'), 'i');
+
+var _userBlacklistRT = _.map(userBlacklist, function(i) {
+    return 'RT @' + i;
+});
+
+var userBlacklistRTPattern = new RegExp(_userBlacklistRT.join('|'));
+
+var textBlacklistPattern = new RegExp ([
+    '\d+%\soff.*udemy.*$'
+].join('|'), 'i');
+
 module.exports = {
     program: program,
     html: html ,
     htmlPattern: htmlPattern,
     lightWhitelist: lightWhitelist,
-    lightWhitelistPattern: lightWhitelistPattern
+    lightWhitelistPattern: lightWhitelistPattern,
+    userBlacklist: userBlacklist,
+    userBlacklistPattern: userBlacklistPattern,
+    userBlacklistRTPattern: userBlacklistRTPattern,
+    textBlacklistPattern: textBlacklistPattern
+    
 };
 

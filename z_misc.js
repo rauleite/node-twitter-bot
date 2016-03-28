@@ -1,4 +1,5 @@
 var moment = require('moment');
+var words = require('./words');
 var _ = require('lodash');
 var str = '2016-03-12T11:31:41-03:00';
 var str2 = '2016-04-12T22:31:45-03:00';
@@ -101,3 +102,56 @@ console.log('--------------------------------- isEmpty -------------------------
 
 var isEmpty = _.isEmpty([undefined]);
 console.log('isEmpty', isEmpty);
+
+
+console.log('------------------------ JOIN ---------------------------');
+
+var joinArr = [
+    '(?!',
+    'https\:\/\/twitter.com.*',
+    '|',
+    'http\:\/\/twitter.com.*',
+    
+    '|',
+    'https\:\/\/stackoverflow.com.*',
+    '|',
+    'http\:\/\/stackoverflow.com.*',
+
+    '|',
+    'http\:\/\/.*\.(png|jpg|jpeg|gif))',
+
+    '(https.*|http.*)'
+    
+].join('');
+
+console.log(joinArr);
+
+var urlBlackList = new RegExp ([
+    '(?!',
+    'https\:\/\/twitter.com.*',
+    '|',
+    'http\:\/\/twitter.com.*',
+    
+    '|',
+    'https\:\/\/stackoverflow.com.*',
+    '|',
+    'http\:\/\/stackoverflow.com.*',
+
+    '|',
+    'http\:\/\/.*\.(png|jpg|jpeg|gif))',
+
+    '(https.*|http.*)'
+    
+].join(''), 'i');
+
+var urls = 'http://twitter.com https://twitter.com https://stackoverflow.com/questions/3622837';
+
+console.log(urls.match(urlBlackList));
+
+console.log(' ------------------------ some -----------------------');
+
+var someText = 'RT @AngularJS_News: The 3 best ways to learn Angular2 DebugMe Blog - AngularJS News - AngularJS News - AngularJS News - AngularJS News http…';
+
+console.log(words.userBlacklistRTPattern);
+
+console.log(someText.match(words.userBlacklistRTPattern));
