@@ -1,10 +1,11 @@
 var Twit = require('twit');
-var moment = require('moment');
 var _ = require('lodash');
 var config  = require('./config');
 var MongoClient = require('mongodb').MongoClient;
 var async = require('async');
 var words = require('./words'); 
+var classifier = require('./classifier');
+var helper = require('./helper');
 
 var T = new Twit(config);
 
@@ -16,109 +17,7 @@ var collectionName = 'inputs';
 
 
 var tweetDb, tweetColl;
-
-
-// Naive blacklist, based on regex
-var blacklist = new RegExp([
-    // 'bootstrap',
-    'portfolio',
-    '\.amazon\.com\/',
-    'meeting',
-    '.*meetup.*',
-    'java',
-    'python',
-    'ruby',
-    'rails',
-    'php',
-    'laravel',
-    'of course'
-    
-].join('|'), 'i');
-
-// Naive blacklist, based on regex
-var whitelist = new RegExp([
-    'free',
-    // 'gratis',
-    // 'grátis',
-    'learning',
-    // 'aprenda',
-    // 'aprendendo',
-    'learncode',
-    'learntocode',
-    'learningcode',
-    'learn',
-    // 'aprender',
-    'beginners',
-    'beginner',
-    // 'iniciante',
-    // 'iniciantes',
-    'course',
-    // 'curso',
-    'tutorials',
-    'tutorial',
-    'discount',
-    // 'desconto',
-    'getting started',
-    'gettingstarted',
-
-    'quick start',
-    'quickstart',
-    'zero to hero',
-    'zerotohero',
-    'start coding',
-    'startcoding',
-    'basics about',
-    'How to',
-    'Howto',
-    'jumpstart',
-    'Tips To Improve',
-    'Building a',
-    'Intro to'
-    
-].join('|'), 'i');
-
-
-var empregos_whitelist = new RegExp([
-    'vaga',
-    'vagas',
-    'carreira',
-    'emprego',
-    'freelance',
-    'freelancer',
-    'vacancy',
-    'vacancies',
-    'homeoffice',
-    'home office',
-    'home-office',
-    'job',
-    'trabalho',
-    'work'
-
-].join('|'), 'i');
-
-// (?!https\:\/\/twitter.com.*|http\:\/\/twitter.com.*|.*https\:\/\/stackoverflow.com.*|.*http\:\/\/stackoverflow.com.*|http\:\/\/.*\.(png|jpg|jpeg|gif))(https.*|http.*)
-var urlExceptions = new RegExp ([
-    '(?!',
-    'https\:\/\/twitter.com.*',
-    '|',
-    'http\:\/\/twitter.com.*',
-    
-    '|',
-    '.*https\:\/\/stackoverflow.com.*',
-    '|',
-    '.*http\:\/\/stackoverflow.com.*',
-
-    '|',
-    '.*http\:\/\/gettopical.com.*',
-    '|',
-    '.*https\:\/\/gettopical.com.*',
-
-    '|',
-    'http\:\/\/.*\.(png|jpg|jpeg|gif))',
-
-    '(https.*|http.*)'
-    
-].join(''), 'i');
+var tweetsID = [];
 
 
 var stream = T.stream('statuses/filter', {track: words.program.concat(words.html) });
@@ -130,92 +29,73 @@ stream.on('tweet', function(tweet) {
         console.log('**** Sem tweetColl');
         return ;
     }
-
-    var text = tweet.text.toLowerCase();
-    // var urlNotTwitterPattern = /(?!https\:\/\/twitter.com.*|http\:\/\/twitter.com.*|http\:\/\/.*\.(png|jpg|jpeg|gif))(https.*|http.*)/g;
-    // if(
-    //     // Se nao e retweet
-    //     // !tweet.retweeted_status &&
-    //     !tweet.in_reply_to_user_id &&
-    //     (tweet.lang === 'en' || tweet.lang === 'pt-BR') &&
-    //     // whitelist.test(text) &&
-    //     empregos_whitelist.test(text) 
-    //   ) {
-    //
-    //     if (!tweet.retweeted) {
-    //         console.log('Scheduling VAGA  RT');
-    //         scheduleFuture(retweetTweet, tweet, 6);
-    //     }
-    // }
-
-    // Vaga de empregos
+    var screen_name = tweet.user.screen_name;
+    var text = tweet.text;
     
     if(
         // Se nao e retweet
-        // !tweet.retweeted_status &&
+        !tweet.retweeted_status &&
         // Don't Fav/RT the middle of a convo
         !tweet.in_reply_to_user_id &&                                     
-        // Prevent Fav/RT/Following specific users
-        !tweet.user.screen_name.match(words.userBlacklistPattern) &&
-        (tweet.lang === 'en' || tweet.lang === 'pt-BR') &&
-        whitelist.test(tweet.text.toLowerCase()) &&
-        !blacklist.test(tweet.text.toLowerCase()) &&
-        // Tem que ter link, que não comece com https:twitter.com
-        // urlNotTwitterPattern.test(text) && ------- deprecated
+        tweet.lang === 'en' &&
+        classifier.isTextWhitelist(text) &&
+
+        // Não precisa mais
+        // !words.blacklist.test(tweet.text.toLowerCase()) &&
+        
         // Tem que ter link dentro da propriedade urls 
         (tweet.entities && tweet.entities.urls && tweet.entities.urls.length !== 0) 
       ) {
-            if(!isActualPost(tweet)) {
-                return ;
-            }
 
-            if(tweet.entities.in_reply_to_screen_name) {
-                if(!tweet.entities.in_reply_to_screen_name.match(words.userBlacklistPattern)) {
-                    console.log('***** words.userBlacklistPattern in_reply_to_screen_name', tweet.entities.in_reply_to_screen_name);
-                    return ;
-                }
+            console.log('** screen_name --', screen_name);
+            console.log('** text --', text);
+            console.log('*** id_str', tweet.id_str);
+
+            // Rejeitar stream repetidos
+            if(!_.some(tweetsID, tweet.id_str)) {
+                tweetsID.push(tweet.id_str); 
+            } else {
+                console.log('** tweetsID já tem --', tweet.id);
+                return;
             }
-            if(
-                tweet.text.match(words.userBlacklistRTPattern) ||
-                tweet.text.match(words.textBlacklistPattern)
-              ) {
-                console.log('*** Pattern in text', tweet.text.match(words.userBlacklistRTPattern));
-                console.log('*** Pattern in text', tweet.text.match(words.textBlacklistPattern));
+            
+            var postActual = helper.isActualPost(tweet);
+            if(!postActual) {
+                console.log('** !postActual --', postActual);
                 return ;
             }
-            // Consta na whitelist, mas precisa de uma moderada.
-            if (words.lightWhitelistPattern.test(text) && isLucky(3/4)) {
-                console.log('***** ligh whitelist', text);
+            
+            // userBlackList
+            if (classifier.isUserBlacklist(screen_name)) {
+                console.log('** UserBlackList --', screen_name);
                 return ;
+            } 
+
+            // tweet.text.match(words.userBlacklistRTPattern)
+            if(classifier.isUserBlacklistRT(text)) {
+                console.log('*** RT Blacklist ', text);
+                return;
             }
-                  
-            console.log('***** is in blacklist?', words.userBlacklistPattern.test(tweet.user.screen_name)); 
-            console.log('***** screen_name', tweet.user.screen_name);
+            
+            // tweet.text.match(words.textBlacklistPattern)
+            if(classifier.isTextBlacklist(text)){
+                console.log('isTextBlacklist --> ', text);
+                return;
+            
+            }
 
             // console.log('scheduling RT');            
             // scheduleFuture(retweetTweet, tweet);
 
             // console.log("--- entities", tweet.entities);
             // console.log("--- urls", tweet.entities.urls);
-            // Rejeita algumas urls, como reddit
-            // if(tweet.entities && tweet.entities.urls && tweet.entities.urls.length !== 0) {
-            var urlsCurrent = tweet.entities.urls; 
 
             // console.log('****** URLs Testada', urlsCurrent);
             
-            var validUrl = _.filter(urlsCurrent, function(o){
-                // Tem que haver alguma url sem ser https://twitter.com*, e não
-                // pode ter palavras da blacklist
-                //  && !blacklist.test(o.expanded_url)
-                console.log('********** o.expanded_url', o.expanded_url);
-                console.log('********** o.expanded_url.match(urlExceptions)', o.expanded_url.match(urlExceptions));
-                return o.expanded_url.match(urlExceptions); 
-            });
-
+            
             // console.log('******* validUrl', validUrl);
-            console.log('******* text', text);
-            if(!validUrl || validUrl.length === 0) {
-                console.log('****** URL Inválida urlExceptions', validUrl);       
+            if(!classifier.isValidUrls(tweet.entities.urls)) {
+                console.log('** URL Inválida -->', tweet.entities.urls);       
                 return ;
             }
         // }
@@ -224,15 +104,15 @@ stream.on('tweet', function(tweet) {
         if(words.htmlPattern.test(text)) {
             if(!tweet.retweeted) {
                 console.log('Scheduling html RT');
-                // scheduleFuture(retweetTweet, tweet, 3);
                 scheduleFuture(retweetTweet, tweet, 3);
+                // scheduleFuture(retweetTweet, tweet, 0);
                 // favorite(tweet);
             }
         } else {
             if (!tweet.retweeted) {
                 console.log('Scheduling MEAN RT');
-                // scheduleFuture(retweetTweet, tweet, 2);
                 scheduleFuture(retweetTweet, tweet, 2);
+                // scheduleFuture(retweetTweet, tweet, 0);
                 // favorite(tweet);
                 // follow(tweet);
             }
@@ -242,14 +122,14 @@ stream.on('tweet', function(tweet) {
 });
 
 function favorite(tweet) {
-    if(!tweet.favorited && isLucky(1/13)) {
+    if(!tweet.favorited && helper.isLucky(1/13)) {
         console.log('Scheduling Favorite');
         scheduleFuture(favoriteTweet, tweet);
     }
 }
 
 function follow(tweet) {
-    if(!tweet.user.following && isLucky(1/40)) {
+    if(!tweet.user.following && helper.isLucky(1/40)) {
         console.log('Scheduling Follow');
         scheduleFuture(followUser, tweet.user);
     }
@@ -270,10 +150,6 @@ var randomMsBetween = function(low, high) {
     return Math.floor(Math.random() * (high - low)) + low;
 };
 
-// Naive dice roll
-var isLucky = function(chances) {
-    return (Math.random() < chances);
-};
 
 var favoriteTweet = function(tweet, count) {
     console.log('Favoriting tweet:' + tweet.text);
@@ -370,11 +246,11 @@ var retweetTweet = function(tweet, count) {
                 var qtdPerm = wordsList.length * percent / 100;
                 // console.log('qtdPerm', qtdPerm);
                 var qtdMatched = textItemMatched.length; 
-                console.log(' *** qtdMatched', qtdMatched);
-                console.log(' *** qtdMatched >= qtdPerm', qtdMatched >= qtdPerm);
-
+                
                 if (qtdMatched >= qtdPerm) {
                     isSimilarTweet = true; 
+                    console.log(' *** qtdMatched', qtdMatched);
+                    console.log(' *** qtdMatched >= qtdPerm', qtdMatched >= qtdPerm);
                     // _.some docsList - break
                     return true;
                 }
@@ -408,8 +284,18 @@ var retweetTweet = function(tweet, count) {
             console.log('retweet_count -->', data.retweet_count);
 
             // console.log('******** Search alternative date', data);
+            
+            var textLucky = classifier.textLucky(data.text); 
+            var wasLucky = helper.isLucky(textLucky / 10);
+            console.log('Text -->', data.text);
+            console.log('Text Lucky -->', textLucky);
+            console.log('Was Lucky --> helper.isLucky(textLucky / 10)', wasLucky);
+            if(wasLucky) {
+                T.post('statuses/retweet/:id', { id: tweet.id_str }, cb);
+            } else {
+                console.log('docker -- ext not lucky', data.text + ' --> ' + textLucky);
+            }
 
-            T.post('statuses/retweet/:id', { id: tweet.id_str }, cb);
             
             return callback(null, 'Tweet Inserted');
      
@@ -423,33 +309,6 @@ var followUser = function(user) {
     console.log('Following user: ' + user.screen_name);
     T.post('friendships/create', {screen_name: user.screen_name, follow: true}, cb);
 };
-
-function isActualPost(data) {
-    var created_at = null;
-    var result = false;
-    // Desnecessario, por retweets estarem removidos do criterio 
-    if(data.retweeted_status) {
-        // console.log('****** data.retweeted_status.created_at'); 
-        created_at = data.retweeted_status.created_at; 
-    } else {
-        created_at = data.created_at;
-    }
-
-    if (isTweetDateToday(created_at)) {
-       result = true;
-    } else {
-       console.log('******** POST ANTIGO -->', created_at);
-    }
-
-    return result; 
-    
-}
-
-function isTweetDateToday(created_at) {
-    var today = moment().locale('en');
-    return today.isSame(new Date(created_at), 'day');
-}
-
 
 // Simple callback to swallow successes and log errors
 var cb = function(err, data, response) {

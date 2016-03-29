@@ -1,5 +1,8 @@
 var moment = require('moment');
 var words = require('./words');
+var classifier = require('./classifier.js');
+var helper = require('./helper');
+
 var _ = require('lodash');
 var str = '2016-03-12T11:31:41-03:00';
 var str2 = '2016-04-12T22:31:45-03:00';
@@ -155,3 +158,39 @@ var someText = 'RT @AngularJS_News: The 3 best ways to learn Angular2 DebugMe Bl
 console.log(words.userBlacklistRTPattern);
 
 console.log(someText.match(words.userBlacklistRTPattern));
+
+console.log('--------------------------- obj -------------------------');
+
+var obj = {
+    'a': 0
+};
+
+if (classifier.isUserBlacklist('docker')) {
+    console.log('--> ', 'docker');
+} 
+
+if (classifier.isUserBlacklistRT('RT @docker adfafasdf')) {
+    console.log('--> ', 'RT ---> docker');
+} 
+
+var text = classifier.textLucky('asdf adf asdf sda docker aafdasfdasdf');
+
+console.log('text lucky -->', text);
+
+console.log('isLucky? -->', helper.isLucky(text / 10));
+
+var text = 'Get up to 96% off all #udemy online courses today, including #angularjs courses: use https://t.co/WdklscDE for discount';
+
+var p = '\\d\+% off.*udemy';
+var pr = new RegExp(p);
+
+var mr = text.match(p);
+var mm = text.match(pr);
+
+console.log('mr -->', mr);
+console.log('mm -->', mm);
+
+var tbl = classifier.isTextBlacklist(text);
+console.log(tbl);
+
+console.log(classifier.isTextBlacklist('Get up to 96% off all #Udemy online courses today, including #angularjs courses: use https://t.co/WdklscDE56 for discount'));
