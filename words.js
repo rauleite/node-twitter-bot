@@ -1,8 +1,8 @@
 var _ = require('lodash');
 
-var self = {};
+var words = {};
 
-self.program = [
+words.program = [
     'javascript',
     // 'node',
     'nodejs',
@@ -39,6 +39,7 @@ self.program = [
     'mean developer',
     // 'mongoose',
     'phonegap',
+    'ionic',
     'ionicframework',
     'ionic framework',
     'docker',
@@ -53,7 +54,7 @@ self.program = [
 
 ];
 
-self.html = [
+words.html = [
     'html5',
     'css3',
     'webcomponent',
@@ -63,28 +64,29 @@ self.html = [
 ];
 
 
-self.htmlPattern = new RegExp(
-    self.html.join('|'), 'i'
+words.htmlPattern = new RegExp(
+    words.html.join('|'), 'i'
 );
 
-self.lightWhitelist = [
+words.lightWhitelist = [
     'docker',
     'udemy'
 ];
 
-self.lightWhitelistPattern = new RegExp(
-   self.lightWhitelist.join('|'), 'i' 
+words.lightWhitelistPattern = new RegExp(
+   words.lightWhitelist.join('|'), 'i' 
 );
 
-self.textRank = {
+// 0 - 10 --> 0 nao posta, 10 posta, 5 tem 50% chances
+words.textRank = {
     'docker': 3,
     'udemy': 3,
+    'python': 3,
     'portfolio': 0,
     '.amazon\\.com/': 0,
     'meeting': 0,
     'meetup': 0,
     'java\\s': 0,
-    'python': 0,
     'ruby': 0,
     'rails': 0,
     'php': 0,
@@ -94,7 +96,7 @@ self.textRank = {
 
 };
 
-self.userRank = {
+words.userRank = {
     'javascriptisez': 0,
     'great_courses': 0,
     'amazing_courses': 0,
@@ -112,12 +114,32 @@ self.userRank = {
     // UDEMY
     'cheapocourses__': 0,
     'cheap_courses_': 0,
+    'CouponsMonsters': 0,
     // Abizy
     'AdamSmitht1': 0
 
 };
+
+words.specialUsers = {
+    'smashingmag': 15,
+    'Medium': 15, 
+    'scotch_io': 5,
+    'codrops': 5,
+    'speckyboy': 5,
+    'DesignerDepot': 5,
+    'html5': 5,
+    'infoworld': 5,
+    'stamplay': 3,
+    'nodejs': 15,
+    'learncodeacad': 2,
+    'LevelUpTuts': 2,
+    'newthinktank': 2,
+    'bucky_roberts': 2,
+    'codek_tv': 2,
+};
+
 // (?!https\:\/\/twitter.com.*|http\:\/\/twitter.com.*|.*https\:\/\/stackoverflow.com.*|.*http\:\/\/stackoverflow.com.*|http\:\/\/.*\.(png|jpg|jpeg|gif))(https.*|http.*)
-self.urlExceptions = [
+words.urlExceptions = [
     '(?!',
     'https://twitter.com.*',
     '|',
@@ -140,41 +162,28 @@ self.urlExceptions = [
     
 ].join('');
 
-// self.textBlacklistPattern = new RegExp ([
-// ].join('|'), 'i');
-
-// Naive blacklist, based on regex
-// self.blacklist = new RegExp([
-//     // 'bootstrap',
-//     'portfolio',
-//     '.amazon.com/',
-//     'meeting',
-//     '.*meetup.*',
-//     'java',
-//     'python',
-//     'ruby',
-//     'rails',
-//     'php',
-//     'laravel',
-//     'of course'
-//     
-// ].join('|'), 'i');
-
 // Se além do whitelist, tiver um textBias, reduz atributos retweet do post
-self.textBias = [
-    'discount',
-    'free',
-    'game',
-    'big data',
-    'machine learning',
-    'internet of things',
-    'neural network',
-    'data mining',
-    'video',
-    'youtube'
-];
+// 100% equivale a chance 100 de retweet (value 0). Nunca usar.
+// 0% equivale, a valor inalterado.
+// 50% equivale a soma da metade do seu proprio valor dele próprio
+words.textBiasPercent = {
+    'discount': 50,
+    'free ': 50,
+    'game ': 50,
+    'big data ': 50,
+    'machine learning ': 50,
+    'internet of things ': 50,
+    'neural network ': 50,
+    'data mining ': 50,
+    'video ': 50,
+    'youtube ': 50,
+    'robotics': 50,
+    'johnny five': 50,
+    'arduino': 50
+};
+
 // Naive blacklist, based on regex
-self.textWhitelist = [
+words.textWhitelist = [
     'basics about',
     'beginners',
     'beginner',
@@ -202,10 +211,9 @@ self.textWhitelist = [
     'zerotohero'
 ];
 
-self.textWhitelistPattern = self.textWhitelist.join('|');
-self.textBiasPattern = self.textBias.join('|');
+words.textWhitelistPattern = words.textWhitelist.join('|');
 
-self.empregos_whitelist = new RegExp([
+words.empregos_whitelist = new RegExp([
     'vaga',
     'vagas',
     'carreira',
@@ -224,7 +232,7 @@ self.empregos_whitelist = new RegExp([
 ].join('|'), 'i');
 
 
-module.exports = self;
+module.exports = words;
 
 // module.exports = {
 //     program: program,
@@ -259,5 +267,25 @@ module.exports = self;
 // ];
 //
 // var userBlacklistPattern = new RegExp(userBlacklist.join('|'), 'i');
+
+// words.textBlacklistPattern = new RegExp ([
+// ].join('|'), 'i');
+
+// Naive blacklist, based on regex
+// words.blacklist = new RegExp([
+//     // 'bootstrap',
+//     'portfolio',
+//     '.amazon.com/',
+//     'meeting',
+//     '.*meetup.*',
+//     'java',
+//     'python',
+//     'ruby',
+//     'rails',
+//     'php',
+//     'laravel',
+//     'of course'
+//     
+// ].join('|'), 'i');
 
 

@@ -1,11 +1,13 @@
-var Twit = require('twit');
-var _ = require('lodash');
-var config  = require('./config');
 var MongoClient = require('mongodb').MongoClient;
-var async = require('async');
-var words = require('./words'); 
+
 var classifier = require('./classifier');
+var config  = require('./config');
 var helper = require('./helper');
+var words = require('./words'); 
+
+var async = require('async');
+var _ = require('lodash');
+var Twit = require('twit');
 
 var T = new Twit(config);
 
@@ -15,28 +17,49 @@ var T = new Twit(config);
 var dbName = 'twitter-bot';
 var collectionName = 'inputs';
 
-
 var tweetDb, tweetColl;
 var tweetsID = [];
+
+var HTML_VALUE = 3;
+var MEAN_VALUE = 2;
+
+var START_TIME_TO_RETWEET = 1000 * 60 * 60 * 0.3;
+var END_TIME_TO_RETWEET = 1000 * 60 * 60 * 0.4;
+
+// var START_TIME_TO_RETWEET = 20;
+// var END_TIME_TO_RETWEET = 30;
 
 
 var stream = T.stream('statuses/filter', {track: words.program.concat(words.html) });
 stream.on('tweet', function(tweet) {
     console.log('Incoming Tweet');
     // Log the tweet no matter what, as log as a connection to Mongo has been established
-    
+            
     if(!tweetColl) {
         console.log('**** Sem tweetColl');
         return ;
     }
+    // Don't Fav/RT the middle of a convo
+    if(tweet.in_reply_to_user_id) {
+        return ;
+    }
+
     var screen_name = tweet.user.screen_name;
     var text = tweet.text;
-    
+   
+    var valueSpecialUser = null;
+    _.some(words.specialUsers, function(value, key) {
+        if(screen_name.match(key)) {
+            valueSpecialUser = value;
+            console.log('** Special User --', key + ': ' + value)
+            return true;
+        }
+    });
+
     if(
+        _.isNumber(valueSpecialUser) ||
         // Se nao e retweet
-        !tweet.retweeted_status &&
-        // Don't Fav/RT the middle of a convo
-        !tweet.in_reply_to_user_id &&                                     
+        // !tweet.retweeted_status &&
         tweet.lang === 'en' &&
         classifier.isTextWhitelist(text) &&
 
@@ -50,6 +73,7 @@ stream.on('tweet', function(tweet) {
             console.log('** screen_name --', screen_name);
             console.log('** text --', text);
             console.log('*** id_str', tweet.id_str);
+
 
             // Rejeitar stream repetidos
             if(!_.some(tweetsID, tweet.id_str)) {
@@ -78,20 +102,12 @@ stream.on('tweet', function(tweet) {
             }
             
             // tweet.text.match(words.textBlacklistPattern)
-            if(classifier.isTextBlacklist(text)){
-                console.log('isTextBlacklist --> ', text);
+            if(classifier.isTextBlacklist(tweet)){
+                console.log('isTextBlacklist --> ', tweet);
                 return;
             
             }
 
-            // console.log('scheduling RT');            
-            // scheduleFuture(retweetTweet, tweet);
-
-            // console.log("--- entities", tweet.entities);
-            // console.log("--- urls", tweet.entities.urls);
-
-            // console.log('****** URLs Testada', urlsCurrent);
-            
             
             // console.log('******* validUrl', validUrl);
             if(!classifier.isValidUrls(tweet.entities.urls)) {
@@ -100,24 +116,24 @@ stream.on('tweet', function(tweet) {
             }
         // }
 
-        // Roll to retweet
-        if(words.htmlPattern.test(text)) {
-            if(!tweet.retweeted) {
-                console.log('Scheduling html RT');
-                scheduleFuture(retweetTweet, tweet, 3);
-                // scheduleFuture(retweetTweet, tweet, 0);
-                // favorite(tweet);
-            }
-        } else {
-            if (!tweet.retweeted) {
-                console.log('Scheduling MEAN RT');
-                scheduleFuture(retweetTweet, tweet, 2);
-                // scheduleFuture(retweetTweet, tweet, 0);
-                // favorite(tweet);
-                // follow(tweet);
+            // Roll to retweet
+            if(words.htmlPattern.test(text)) {
+                if(!tweet.retweeted) {
+                    console.log(' ** Scheduling html RT');
+                    scheduleFuture(retweetTweet, tweet, HTML_VALUE, valueSpecialUser);
+                    // scheduleFuture(retweetTweet, tweet, 0);
+                    // favorite(tweet);
+                }
+            } else {
+                if (!tweet.retweeted) {
+                    console.log('** Scheduling MEAN RT');
+                    scheduleFuture(retweetTweet, tweet, MEAN_VALUE, valueSpecialUser);
+                    // scheduleFuture(retweetTweet, tweet, 0);
+                    // favorite(tweet);
+                    // follow(tweet);
+                }
             }
         }
-    }
 
 });
 
@@ -136,12 +152,48 @@ function follow(tweet) {
 }
 
 // Instead of Fav/RT/Follow immediately, do it after a variable delay.
-// Makes things seem a bit more human.
-var scheduleFuture = function(fn, arg, count) {
-    // 40 minutos a 1 hora e meia
+var scheduleFuture = function(fn, tweet, resistValue, valueSpecialUser) {
+    // Pode reduzir resitencia (aumentar chance dele ser postado)
+    var resistValueWhithBias = classifier.biasRetweetValue(resistValue, tweet);
+    // Pode aumentar resistencia (reduzir chance dele ser postado)
+    var hours = helper.tweetedAtHours(tweet);
 
-    setTimeout(fn.bind(this, arg, count), randomMsBetween((1000 * 60 * 60 * 0.3), (1000 * 60 * 60 * 0.4)));
-    // setTimeout(fn.bind(this, arg, count), randomMsBetween(2000, 3000));
+    if(hours > 1) {
+        if(hours < 2) {
+            resistValueWhithBias += 1;  
+        } else if(hours < 4) {
+            resistValueWhithBias += 2;  
+        } else if(hours < 6) {
+            resistValueWhithBias += 3;  
+        } else if(hours < 8) {
+            resistValueWhithBias += 4;  
+        } else if(hours < 10) {
+            resistValueWhithBias += 5;  
+        } else if(hours < 12) {
+            resistValueWhithBias += 6;  
+        } else if(hours < 14) {
+            resistValueWhithBias += 7;  
+        } else if(hours < 16) {
+            resistValueWhithBias += 8;  
+        } else if(hours < 18) {
+            resistValueWhithBias += 9;  
+        } else if(hours < 20) {
+            resistValueWhithBias += 10;  
+        } else if(hours < 22) {
+            resistValueWhithBias += 11;  
+        } else if(hours < 24) {
+            resistValueWhithBias += 12;  
+        }
+
+    }
+    if(valueSpecialUser) {
+        resistValueWhithBias += valueSpecialUser;
+    }
+
+    console.log('*** special user?', valueSpecialUser);
+    console.log('*** diff hours -- ', hours)
+    console.log('*** Bias hours? --', resistValueWhithBias);
+    setTimeout(fn.bind(this, tweet, resistValueWhithBias), randomMsBetween(START_TIME_TO_RETWEET, END_TIME_TO_RETWEET));
     
 };
 
@@ -285,7 +337,7 @@ var retweetTweet = function(tweet, count) {
 
             // console.log('******** Search alternative date', data);
             
-            var textLucky = classifier.textLucky(data.text); 
+            var textLucky = classifier.textLucky(data); 
             var wasLucky = helper.isLucky(textLucky / 10);
             console.log('Text -->', data.text);
             console.log('Text Lucky -->', textLucky);

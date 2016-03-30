@@ -1,65 +1,66 @@
 var words = require('./words');
+var helper = require('./helper');
 
 var _ = require('lodash'); 
 
-var self = {};
+var classifier = {};
 
 
-// self.isBlacklistComposite = function(fn){
+// classifier.isBlacklistComposite = function(fn){
 //
 // }
-self.isUserBlacklist = function (screen_name) {
+classifier.isUserBlacklist = function (screen_name) {
     var rank = words.userRank[screen_name];
     return rank === 0;
 };
 
-self.isUserBlacklistRT = function (text) {
+classifier.isUserBlacklistRT = function (text) {
     return _.some(words.userRank, function (value, key) {
         if (value !== 0) return;     
         return text.match('RT @' + key);
     });
 };
 
-self.isTextBlacklist = function (text) {
-    return self.textLucky(text) === 0;
+classifier.isTextBlacklist = function (tweet) {
+    return classifier.textLucky(tweet) === 0;
 };
 
-self.validUrls = function(urlsCurrent) {
+// Tem que haver alguma url sem ser https://twitter.com*, e não
+// pode ter palavras da blacklist
+classifier.validUrls = function(urlsCurrent) {
     return _.filter(urlsCurrent, function(o){
-        // Tem que haver alguma url sem ser https://twitter.com*, e não
-        // pode ter palavras da blacklist
-        //  && !blacklist.test(o.expanded_url)
-        // console.log('********** o.expanded_url.match(urlExceptions)', o.expanded_url.match(urlExceptions));
         return o.expanded_url.match(words.urlExceptions); 
     });
 
 };
 
-self.isValidUrls = function(urlsCurrent) {
-    var urls = self.validUrls(urlsCurrent); 
+classifier.isValidUrls = function(urlsCurrent) {
+    var urls = classifier.validUrls(urlsCurrent); 
     return urls && urls.length > 0;
 };
 
 // retorna o menor level match, de 0 - 10. Senão 10 (default)
-self.textLucky = function (text) {
-    // var pattern = new RegExp(words.textRank.join('|'), 'i');
-    var textMatches = _.filter(words.textRank, function (value, key) {
-        if (!text.toLowerCase().match(key.toLowerCase())) return false;
-        return true;
-        
-    });
-
-    var level = _.min(textMatches);
-    
+classifier.textLucky = function (tweet) {
+    var level = helper.filterMinMatch(words.textRank, tweet.text);
     return level === undefined || level === null ? 10 : level;
 };
 
 
-self.isTextWhitelist = function(text) {
+classifier.isTextWhitelist = function (text) {
     var pattern = words.textWhitelistPattern.toLowerCase();
     var str = text.toLowerCase();
     return str.match(pattern);
 };
 
-module.exports = self;
+// retorna o maior bias matched, de 0 - j
+classifier.biasRetweetValue = function (originalValue, tweet) {
+    var biasValue = helper.filterMaxMatch(words.textBiasPercent, tweet.text);
+    if(!_.isNumber(biasValue)) {
+        return originalValue;
+    }
+    // Arredonda: 1.4 = 1; 1.6 = 2; 1.5 = 2;
+    return _.round(helper.biasCalc(originalValue, biasValue));
+};
+
+module.exports = classifier;
 // var userBlacklistRTPattern = new RegExp(_userBlacklistRT.join('|'));

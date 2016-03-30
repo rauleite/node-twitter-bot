@@ -173,24 +173,12 @@ if (classifier.isUserBlacklistRT('RT @docker adfafasdf')) {
     console.log('--> ', 'RT ---> docker');
 } 
 
-var text = classifier.textLucky('asdf adf asdf sda docker aafdasfdasdf');
+console.log(3 - (3 * 50 / 100));
 
-console.log('text lucky -->', text);
+console.log(_.round(1.5))
+console.log(moment().minutes()) 
 
-console.log('isLucky? -->', helper.isLucky(text / 10));
+console.log(_.max([10, 10]))
 
-var text = 'Get up to 96% off all #udemy online courses today, including #angularjs courses: use https://t.co/WdklscDE for discount';
 
-var p = '\\d\+% off.*udemy';
-var pr = new RegExp(p);
-
-var mr = text.match(p);
-var mm = text.match(pr);
-
-console.log('mr -->', mr);
-console.log('mm -->', mm);
-
-var tbl = classifier.isTextBlacklist(text);
-console.log(tbl);
-
-console.log(classifier.isTextBlacklist('Get up to 96% off all #Udemy online courses today, including #angularjs courses: use https://t.co/WdklscDE56 for discount'));
+if(true || false && false) console.log('trueeee')
