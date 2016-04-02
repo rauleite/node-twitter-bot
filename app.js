@@ -20,8 +20,8 @@ var collectionName = 'inputs';
 var tweetDb, tweetColl;
 var tweetsID = [];
 
-var HTML_VALUE = 3;
-var MEAN_VALUE = 2;
+var HTML_VALUE = 4;
+var MEAN_VALUE = 3;
 
 var START_TIME_TO_RETWEET = 1000 * 60 * 60 * 0.3;
 var END_TIME_TO_RETWEET = 1000 * 60 * 60 * 0.4;
@@ -49,9 +49,10 @@ stream.on('tweet', function(tweet) {
    
     var valueSpecialUser = null;
     _.some(words.specialUsers, function(value, key) {
-        if(screen_name.match(key)) {
+        var XKey = '^' + key + '$';
+        if(screen_name.match(XKey)) {
             valueSpecialUser = value;
-            console.log('** Special User --', key + ': ' + value)
+            console.log('** Special User --', key + ': ' + value);
             return true;
         }
     });
@@ -96,14 +97,14 @@ stream.on('tweet', function(tweet) {
             } 
 
             // tweet.text.match(words.userBlacklistRTPattern)
-            if(classifier.isUserBlacklistRT(text)) {
-                console.log('*** RT Blacklist ', text);
+            if(classifier.isUserBlacklistRT(tweet)) {
+                console.log('*** RT Blacklist ', tweet.text);
                 return;
             }
             
             // tweet.text.match(words.textBlacklistPattern)
             if(classifier.isTextBlacklist(tweet)){
-                console.log('isTextBlacklist --> ', tweet);
+                console.log('isTextBlacklist --> ', tweet.text);
                 return;
             
             }
@@ -191,7 +192,7 @@ var scheduleFuture = function(fn, tweet, resistValue, valueSpecialUser) {
     }
 
     console.log('*** special user?', valueSpecialUser);
-    console.log('*** diff hours -- ', hours)
+    console.log('*** diff hours -- ', hours);
     console.log('*** Bias hours? --', resistValueWhithBias);
     setTimeout(fn.bind(this, tweet, resistValueWhithBias), randomMsBetween(START_TIME_TO_RETWEET, END_TIME_TO_RETWEET));
     
@@ -294,7 +295,7 @@ var retweetTweet = function(tweet, count) {
                     }); 
                 });
                 // console.log('wordsList.length', wordsList.length);
-                var percent = 70;
+                var percent = 60;
                 var qtdPerm = wordsList.length * percent / 100;
                 // console.log('qtdPerm', qtdPerm);
                 var qtdMatched = textItemMatched.length; 
@@ -337,15 +338,26 @@ var retweetTweet = function(tweet, count) {
 
             // console.log('******** Search alternative date', data);
             
-            var textLucky = classifier.textLucky(data); 
-            var wasLucky = helper.isLucky(textLucky / 10);
+            var userLucky = classifier.userLucky(data);
+            console.log('*** app.js screen_name' , data.screen_name)
+            var wasUserLucky = helper.isLucky(userLucky / 10);
+
+            var textLucky = classifier.textLucky(data);
+            var wasTextLucky = helper.isLucky(textLucky / 10);
+
             console.log('Text -->', data.text);
             console.log('Text Lucky -->', textLucky);
-            console.log('Was Lucky --> helper.isLucky(textLucky / 10)', wasLucky);
-            if(wasLucky) {
+            console.log('Was Text Lucky --> helper.isLucky(textLucky / 10)', wasTextLucky);
+
+            console.log('User -->', data.screen_name);
+            console.log('User Lucky -->', userLucky);
+            console.log('Was User Lucky --> helper.isLucky(userLucky / 10)', wasUserLucky);
+
+            if(wasUserLucky && wasTextLucky) {
                 T.post('statuses/retweet/:id', { id: tweet.id_str }, cb);
             } else {
-                console.log('docker -- ext not lucky', data.text + ' --> ' + textLucky);
+                console.log('docker -- ext not ', data.text + ' --> ' + textLucky);
+                console.log('docker -- ext not ', data.text + ' --> ' + userLucky);
             }
 
             

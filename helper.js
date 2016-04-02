@@ -23,17 +23,17 @@ helper.tweetedAtHours = function(tweet) {
     var created_at = helper.dateTweetOrRetweet(tweet);
     
     var created = moment(new Date(created_at)).locale('en');
-    console.log('created 1 --', created.hours())
+    console.log('created --', created.hours());
 
     // created.add(hours, 'hours');
     // console.log('created 2 --', created._d)
 
     var now = moment(new Date()).locale('en');
-    console.log('now --', now.hours())
+    console.log('now --', now.hours());
     
     // var result = created.isBefore(now, 'hours');
     var result = now.hours() - created.hours();
-    console.log('result --', result)
+    console.log('result --', result);
     return result;
 };
 
@@ -50,7 +50,7 @@ helper.dateTweetOrRetweet = function(tweet) {
     }
 };
 
-helper.filterMatches = function(mapObj, text) {
+helper.filterTextMatches = function(mapObj, text) {
     text = text.toLowerCase();
     var valuesMatched = [];
     _.forEach(mapObj, function (value, key) {
@@ -66,15 +66,35 @@ helper.filterMatches = function(mapObj, text) {
    
 };
 
+helper.filterUserMatches = function(mapObj, screen_name) {
+    console.log('*** helper -- ', screen_name);
+    var user = screen_name;
+    var valueMatched;
+    _.some(mapObj, function (value, key) {
+        // console.log(key)
+        // console.log(text)
+        // console.log(value)
+        if (user.match(key)) { 
+            valuesMatched.push(value);
+        }
+    });
+    return valueMatched;
+
+   
+};
+
 // Retorna um numero ou um array vazio
-helper.filterMinMatch = function(mapObj, text) {
-    console.log('texttttt', text)
-    return _.min(helper.filterMatches(mapObj, text));
+helper.filterTextMinMatch = function(mapObj, text) {
+    return _.min(helper.filterTextMatches(mapObj, text));
+};
+
+helper.filterUserRankMatch = function(mapObj, text) {
+    return _.min(helper.filterUserMatches(mapObj, text));
 };
 
 // Retorna um numero ou um array vazio
 helper.filterMaxMatch = function(mapObj, text) {
-    return _.max(helper.filterMatches(mapObj, text));
+    return _.max(helper.filterTextMatches(mapObj, text));
 };
 
 helper.biasCalc = function (originalValue, biasValue) {

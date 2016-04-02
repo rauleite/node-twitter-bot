@@ -14,11 +14,15 @@ classifier.isUserBlacklist = function (screen_name) {
     return rank === 0;
 };
 
-classifier.isUserBlacklistRT = function (text) {
-    return _.some(words.userRank, function (value, key) {
-        if (value !== 0) return;     
-        return text.match('RT @' + key);
+classifier.isUserBlacklistRT = function (tweet) {
+   var userMatched = null; 
+    _.some(words.userRank, function (value, key) {
+        if (value === 0 && tweet.text.match('RT @' + key)) {
+            userMatched = key;
+            return true; 
+        }      
     });
+    return userMatched;
 };
 
 classifier.isTextBlacklist = function (tweet) {
@@ -41,7 +45,13 @@ classifier.isValidUrls = function(urlsCurrent) {
 
 // retorna o menor level match, de 0 - 10. Senão 10 (default)
 classifier.textLucky = function (tweet) {
-    var level = helper.filterMinMatch(words.textRank, tweet.text);
+    var level = helper.filterTextMinMatch(words.textRank, tweet.text);
+    return level === undefined || level === null ? 10 : level;
+};
+
+// retorna o menor level match, de 0 - 10. Senão 10 (default)
+classifier.userLucky = function (tweet) {
+    var level = helper.filterUserRankMatch(words.userRank, tweet.user.screen_name);
     return level === undefined || level === null ? 10 : level;
 };
 

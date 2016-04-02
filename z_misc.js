@@ -169,10 +169,6 @@ if (classifier.isUserBlacklist('docker')) {
     console.log('--> ', 'docker');
 } 
 
-if (classifier.isUserBlacklistRT('RT @docker adfafasdf')) {
-    console.log('--> ', 'RT ---> docker');
-} 
-
 console.log(3 - (3 * 50 / 100));
 
 console.log(_.round(1.5))
@@ -180,5 +176,7 @@ console.log(moment().minutes())
 
 console.log(_.max([10, 10]))
 
-
-if(true || false && false) console.log('trueeee')
+var m = 'RT @smashingmag dadfadf'.match('.*RT @\\w+\\s');
+console.log(m);
+   
+console.log('andorrala vella'.match('andorra\\s*la\\s*vella'));
